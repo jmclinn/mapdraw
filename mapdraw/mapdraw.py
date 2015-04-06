@@ -71,7 +71,7 @@ def setargs(args):
       args['y'] = int(args['y'])
    if 'mask' in args:
       args['mask'] = args['mask'].split(',')
-      args['mask'][0] = int(args['mask'][0]) 
+      args['mask'][0] = int(float(args['mask'][0]))
    if 'background' not in args:
       args['background'] = 'white'
    if 'display' not in args:
@@ -94,6 +94,46 @@ def dataload(args):
    lon = f.variables[lon0]
    lat = f.variables[lat0]
    data = f.variables[data][depth,:,:]
+   # check for masked array and remove masked values
+   if hasattr(data,'fill_value'):
+      data = data.filled(data.fill_value)
+   
+   # crop to subregion
+   if 'crop' in args:
+      latmin = lat[0]
+      latmax = lat[len(lat)-1]
+      lonmin = lon[0]
+      lonmax = lon[len(lon)-1]
+      # parse crop arg
+      crop = args['crop'].split(',')
+      args['crop'] = crop
+      for i,c in enumerate(crop):
+         crop[i] = float(c)
+      # find position of crop range in lat and lon
+      for i,y in enumerate(lat):
+         if y >= crop[2] and lat[i-1] <= crop[2]:
+            latmin = i
+         if y >= crop[0] and lat[i-1] <= crop[0]:
+            latmax = i
+      for i,y in enumerate(lon):
+         if y >= crop[3] and lon[i-1] <= crop[3]:
+            lonmin = i
+         if y >= crop[1] and lon[i-1] <= crop[1]:
+            lonmax = i
+      # crop lat and lon
+      lat = lat[latmin:latmax]
+      lon = lon[lonmin:lonmax]
+      # crop data
+      cdata = []
+      for i in data:
+         cdata.append(i[lonmin:lonmax])
+      #data = map(list, zip(*cdata))
+      data = [[row[idx] for row in cdata] for idx in xrange(len(cdata[0]))]
+      cdata = []
+      for i in data:
+         cdata.append(i[latmin:latmax])
+      data = [[row[idx] for row in cdata] for idx in xrange(len(cdata[0]))]
+      
    
    # multipily by normalization factor
    if 'norm' in args:
@@ -123,30 +163,95 @@ def dataload(args):
 
 # ===== TRANSFORMATION =====
 
-# === cylindrical equal area ===
+# === even lat/lon disparities ===
 def transform(args):
-   lat = args['lat']
-   lat0 = lat[0]
-   lat1 = lat[len(lat) - 1]
-   latnum = []
-   scale = 100
-   for i,y in enumerate(reversed(lat)):
-      latnum.append( int(round(math.sin(y*math.pi/180+math.pi/2)*scale)) )
-   
    data = args['data']
-   ylen = args['ylen']
-   data2 = []
-   for i,row in enumerate(reversed(data)):
-      for k in range(latnum[i]):
-         data2.append(row)
-
-   total = len(data2)
-   data3 = data2[0::int(round(total/ylen))]
-   ylen = len(data3)
+   lat = args['lat']
+   lat2 = []
+   latmin = lat[0]
+   latmax = lat[len(lat)-1]
+   latrange = abs(latmax-latmin)
    
-   args['data'] = data3
-   args['ylen'] = ylen
+   #imagesize - human input
+   args['size'] = 1000
+   
+   spc = latrange / args['size']
+   for i in range(args['size']):
+      lat2.append(latmin + ( i * spc ))
+   
+   lat3 = []
+   val = 0
+   for x in lat2[0:]:
+      xf = round(float(x),4)
+      for k,y in enumerate(lat[0:]):
+         yf = round(float(y),4)
+         if xf >= yf:
+            val = k
+      lat3.append(val)
+   
+   data2 = []
+   for y in reversed(lat3):
+      data2.append(data[y])
+   
+   data3 = [[row[idx] for row in data2] for idx in xrange(len(data2[0]))]
+   
+   lon = args['lon']
+   lon2 = []
+   lonmin = lon[0]
+   lonmax = lon[len(lon)-1]
+   lonrange = abs(lonmax - lonmin)
+   xsize = lonrange / latrange * args['size']
+   xspc = lonrange / xsize
+   for i in range(int(xsize)):
+      lon2.append(lonmin + ( i * xspc ))
+   lon3 = []
+   val = 0
+   for x in lon2[0:]:
+      xf = round(float(x),4)
+      for k,y in enumerate(lon[0:]):
+         yf = round(float(y),4)
+         if xf >= yf:
+            val = k
+      lon3.append(val)
+      
+   data4 = []
+   for y in lon3:
+      data4.append(data3[y])
+   
+   data5 = [[row[idx] for row in data4] for idx in xrange(len(data4[0]))]
+   
+   args['data'] = data5
+   args['lat'] = lat2
+   args['lon'] = lon2
+   args['ylen'] = len(lat2)
+   args['xlen'] = len(lon2)
    return args
+
+## === cylindrical equal area ===
+#def transform1(args):
+#   lat = args['lat']
+#   lat0 = lat[0]
+#   lat1 = lat[len(lat) - 1]
+#   latnum = []
+#   scale = 100
+#   for i,y in enumerate(reversed(lat)):
+#      #latnum.append( int(round(math.sin(y*math.pi/180+math.pi/2)/math.cos(math.pi/2)*scale)) )
+#      latnum.append( int(round(math.sin(y*math.pi/180+math.pi/2)*scale)) )
+#   
+#   data = args['data']
+#   ylen = args['ylen']
+#   data2 = []
+#   for i,row in enumerate(reversed(data)):
+#      for k in range(latnum[i]):
+#         data2.append(row)
+#
+#   total = len(data2)
+#   data3 = data2[0::int(round(total/ylen))]
+#   ylen = len(data3)
+#   
+#   args['data'] = data3
+#   args['ylen'] = ylen
+#   return args
 
 # ===== COLOR MAP =====
 def colormap(args): # make colormap
@@ -176,7 +281,7 @@ def colormap(args): # make colormap
       for x,val in enumerate(sl): # for each point in sublist (column)
       # assign colors
          if val < rangemin:
-            if val < args['mask'][0]:
+            if val <= args['mask'][0]:
                clr = args['mask'][1]
             else:
                clr = args['clr_min_max'][0]
@@ -193,82 +298,6 @@ def colormap(args): # make colormap
    
    args['datamap'] = dictlist
    
-   # ------------------------------------------
-   
-#   if 'def' not in args:
-#      incr = int(20000/rangelen)
-#      if incr <= 1:
-#         args['incrm'] = int(1 / (20000./rangelen))
-#         incr = 1
-##         print args['incrm']
-#   else:
-#      incr = int(args['def'])
-#   
-##   print incr
-#   
-#   if 'incrm' in args:
-#      incrm = args['incrm']
-#      cr2 = rgb2hex.linear_gradient(args['colors'][1],args['colors'][2],10001)['hex']
-#      cr1 = rgb2hex.linear_gradient(args['colors'][0],args['colors'][1],10001)['hex']
-#      incr = 1./incrm
-#      
-#   #   crlen = len(cr2)
-#   #   cr4 = []
-#   #   cr3 = []
-#   #   for c in cr2:
-#   #      cr5 = [c]
-#   #      cr6 = cr5 * incrm
-#   #      cr4.extend(cr6)
-#   #   cr2 = cr4
-#   #   cr2.extend(cr5)
-#   #   for c in cr1:
-#   #      cr5 = [c]
-#   #      cr6 = cr5 * incrm
-#   #      cr3.extend(cr6)
-#   #   cr1 = cr3
-#   #   cr1.extend(cr5)
-#   
-#   else:
-#      cr2 = rgb2hex.linear_gradient(args['colors'][1],args['colors'][2],(int(rangelen/2*incr))+1)['hex']
-#      cr1 = rgb2hex.linear_gradient(args['colors'][0],args['colors'][1],(int(rangelen/2*incr))+1)['hex']
-#   
-#   dictlist = {}
-#   
-#   toph = (rangemin + rangelen/2)
-#
-#   # === PAIR DATA WITH COLOR MAP ===
-#   for y,sl in enumerate(args['data']): # for each sublist within dataset (row)
-#      for x,i in enumerate(sl): # for each point in sublist (column)
-#         val = args['colors'][1]
-#         #top half of data range
-#         if i > rangemid:
-#            if i <= rangemax:
-#               val = cr2[int((i - toph) * incr)]
-#            else:
-#               val = args['colors'][1]
-##               val = args['colors'][2]
-#         #bottom half of data range
-#         elif i < rangemid:
-#            if i >= rangemin:
-#               val = cr1[int((i - rangemin) * incr)]
-#            else:
-#               val = args['colors'][1]
-##               val = args['colors'][0] 
-#         # mask
-#         if 'mask' in args:
-#            if i <= args['mask'][0]:
-#               val = args['mask'][1]
-#         # add to dict
-#         if val in dictlist:
-#            dictlist[val].append((x,y))
-#         else:
-#            dictlist[val] = [(x,y)]
-#            
-#   args['datamap'] = dictlist
-#
-   # ===== COLORBAR CREATION =====
-#   clr = (cr1 + cr2)
-##   clr = clr[::-1000]
 
    widthclr = args['colorbar']
    heightclr = len(crange)
@@ -285,18 +314,45 @@ def colormap(args): # make colormap
 
 # ===== MAP IMAGE CREATION =====
 def mapdraw(args,colorbar):
+   
    img = Image.new('RGB',(args['xlen'],args['ylen']),'white')
    draw = Draw(img)
-
+   
+   # Draw Map
    for key,value in args['datamap'].iteritems():
       draw.point(value,getrgb(str(key)))
+   
+   if 'lines' in args:
+      # Latitude Lines
+      lat = [round(i,1) % int(args['lines']) for i in reversed(args['lat'])]
+      io = 0
+      for i,y in enumerate(lat):
+         if y == 0.0:
+            if io == 0:
+               draw.line([(0,i),(args['xlen'],i)],getrgb('#aaaaaa'))
+               io = 1
+         else:
+            io = 0
+      # Longitude Lines
+      lon = [round(i,1) % int(args['lines']) for i in args['lon']]
+      io = 0
+      for i,y in enumerate(lon):
+         if y == 0.0:
+            if io == 0:
+               draw.line([(i,0),(i,args['ylen'])],getrgb('#aaaaaa'))
+               io = 1
+         else:
+            io = 0
+      
 
-   img2 = img.resize((args['y'],int(0.95*args['y'])), Image.BILINEAR)
-
+   #img2 = img.resize((args['y'],int(0.95*args['y'])), Image.BILINEAR)
+   img2 = img
+   #img2 = img.resize((int(args['xlen']*args['xlen']/args['ylen']),args['ylen']), Image.BILINEAR)
+   
    imgclr = colorbar.resize((args['colorbar'],img2.size[1]), Image.BILINEAR)
 
    # ===== ENTIRE IMAGE CREATION W/ TEXT=====
-   imgbox = Image.new('RGB',((300+args['y']+args['colorbar']),(img2.size[1]+200)),args['background'])
+   imgbox = Image.new('RGB',((300+img2.size[0]+args['colorbar']),(img2.size[1]+200)),args['background'])
    imgbox.paste(img2,(100,100))
    imgbox.paste(imgclr,((150+img2.size[0]),100))
 

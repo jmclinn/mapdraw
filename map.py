@@ -9,9 +9,9 @@ args = {}
 #print len(sys.argv)
 if len(sys.argv) > 1:
    for i,arg in enumerate(sys.argv[1::2]):
-#      print arg
+      #print arg
       args[arg] = sys.argv[2*i+2]
-#      print args[arg]
+      #print args[arg]
 
 args = mapdraw.setargs(args)
 if 'file' in args:
