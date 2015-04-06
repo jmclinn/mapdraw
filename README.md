@@ -66,7 +66,7 @@ The order the following arguments are written does not matter, just that the app
 (values where DEFAULT is FAILURE are necessary arguments)
 
 | KEY         | VALUE                             | DEFAULT                           | EXAMPLE                       |
-| ----------- |:--------------------------------- |:--------------------------------- |:----------------------------- |
+| ----------- | --------------------------------- | --------------------------------- | ----------------------------- |
 | file        | path/to/file                      | FAILURE                           | "/example/path/to/file.dat"   |
 | data        | data variable in file             | FAILURE                           | data                          |
 | lat         | latitude variable in file         | FAILURE                           | lat                           |
