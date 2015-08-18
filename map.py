@@ -16,8 +16,10 @@ if len(sys.argv) > 1:
 args = mapdraw.setargs(args)
 if 'file' in args:
    args = mapdraw.dataload(args)
-   args = mapdraw.transform(args)
    args, colorbar = mapdraw.colormap(args)
+   if 'sphere' not in args:
+      args = mapdraw.transform(args)
+   args = mapdraw.colorset(args)
    mapdraw.mapdraw(args,colorbar)
    
    time1 = time.time() - time0
