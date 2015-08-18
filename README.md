@@ -18,12 +18,6 @@ https://github.com/Unidata/netcdf4-python
 
 http://unidata.github.io/netcdf4-python/
 
-### Attribution and Acknowledgement
-
-The rgb2hex code used to create linear color gradients was taken from code written by Ben Southgate, available at https://github.com/bsouthga/blog/blob/master/app/posts/color-gradients-with-python.md.
-
-I have not received any express permission to use Ben's code, which I found originally on his site http://bsou.io as a public blog post. I was unable to find any license information about this code prior to implementing it into mapdraw.
-
 ### Usage
 
 This code has only been tested and run on Mac OSX and Linux systems with Python 2.76 - 2.79. It has been used to read data off of *.dat and *.nc files with data saved in the netCDF-4 format and containing the following necessary data:
@@ -143,3 +137,10 @@ Express instructions for 'movie.py' are included in the file.
 To use mapdraw from movie.py, first move into the mapdraw parent folder on the command line or terminal window.
 
 Run **$ python movie.py**
+
+
+### Attribution and Acknowledgement
+
+The rgb2hex code used to create linear color gradients was taken from code written by Ben Southgate, available at https://github.com/bsouthga/blog/blob/master/app/posts/color-gradients-with-python.md.
+
+I have not received any express permission to use Ben's code, which I found originally on his site http://bsou.io as a public blog post. I was unable to find any license information about this code prior to implementing it into mapdraw.
